@@ -1,3 +1,4 @@
+#导包
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -8,16 +9,16 @@ from matplotlib import pyplot as plt
 
 from  utils import plot_image, plot_curve, one_hot
 
-batch_size = 512
+batch_size = 512  #一次处理一张图片的数量
 # step1. load dataset
 train_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.MNIST('mnist_data', train=True, download=True,
+    torchvision.datasets.MNIST('mnist_data', train=True, download=True,  #加载MNIST数据集
                                transform=torchvision.transforms.Compose([
-                                   torchvision.transforms.ToTensor(),
+                                   torchvision.transforms.ToTensor(),#将numpy格式转化为tensor
                                    torchvision.transforms.Normalize(
-                                       (0.1307,), (0.3081,))
+                                       (0.1307,), (0.3081,))  #将数据均匀分布在0附近，提高性能
                                ])),
-    batch_size=batch_size, shuffle=True)
+    batch_size=batch_size, shuffle=True) #一次加载图片的数量，加载时要做随机的打散
 
 test_loader = torch.utils.data.DataLoader(
     torchvision.datasets.MNIST('mnist_data/', train=False, download=True,
@@ -32,49 +33,51 @@ x, y = next(iter(train_loader))
 print(x.shape, y.shape, x.min(), x.max())
 plot_image(x, y, 'image sample')
 
-class Net(nn.Module):
 
+#创建网络
+class Net(nn.Module):
+    #实现初始化的函数
     def __init__(self):
         super(Net, self).__init__()
 
-        #xw+b
+        #新建三层xw+b
         self.fc1 = nn.Linear(28*28, 256)
         self.fc2 = nn.Linear(256, 64)
         self.fc3 = nn.Linear(64, 10)
-
+    #计算过程
     def forward(self, x):
         # x: [b, 1, 28, 28]
         # h1 = relu(xw1+b1)
-        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc1(x)) #把h1放到非线性的函数里
         # h2 = relu(h1w2+b2)
-        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc2(x)) #把h2放到非线性的函数里
         # h3 = h2w3+b3
-        x = self.fc3(x)
+        x = self.fc3(x) #得到输出
+        return x  #返回输出
 
-        return x
-
+#创建网络对象
 net = Net()
 # [w1, b1, w2, b2, w3, b3]
-optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
+optimizer = optim.SGD(net.parameters(), lr=0.01, momentum=0.9) #优化器
 
 train_loss = []
-for epoch in range(3):
+for epoch in range(3): #对数据集迭代3遍
 
-    for batch_idx, (x, y) in enumerate(train_loader):
+    for batch_idx, (x, y) in enumerate(train_loader): #完成此循环会对整个数据集迭代一遍
 
         # x: [b, 1, 28, 28], y: [512]
         # [b, 1, 28, 28] => [b, feature]
-        x = x.view(x.size(0), 28*28)
+        x = x.view(x.size(0), 28*28) #把图片打平
         # => [b, 10]
         out = net(x)
         # [b, 10]
         y_onehot = one_hot(y)
         # loss = mse(out, y_onehot)
-        loss = F.mse_loss(out, y_onehot)
-        optimizer.zero_grad()
-        loss.backward()
+        loss = F.mse_loss(out, y_onehot) #计算out与y_onehot之间的均方差
+        optimizer.zero_grad() #清零梯度
+        loss.backward() #计算梯度
         # w' = w - lr*grad
-        optimizer.step()
+        optimizer.step() #更新梯度
 
         train_loss.append(loss.item())
         if batch_idx % 10==0:
@@ -82,19 +85,21 @@ for epoch in range(3):
 plot_curve(train_loss)
 #we get optimal [w1, b1, w2, b2, w3, b3]
 
+#准确度测试
 total_correct = 0
 for x,y in test_loader:
-    x = x.view(x.size(0), 28*28)
-    out = net(x)
+    x = x.view(x.size(0), 28*28) #把图片打平
+    out = net(x) #得到网络输出
     # out: [b, 10] => pred: [b]
-    pred = out.argmax(dim=1)
-    correct = pred.eq(y).sum().float().item()
+    pred = out.argmax(dim=1) #预测值
+    correct = pred.eq(y).sum().float().item() #正确值
     total_correct += correct
 
-total_num = len(test_loader.dataset)
+total_num = len(test_loader.dataset) #计算总体数量
 acc = total_correct / total_num
-print('test acc', acc)
+print('test acc', acc) #打印准确度
 
+#得到每张具体图片的预测结果
 x, y = next(iter(test_loader))
 out = net(x.view(x.size(0), 28*28))
 pred = out.argmax(dim=1)
